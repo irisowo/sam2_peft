@@ -14,8 +14,9 @@ model:
       global_att_blocks: [23, 33, 43]
       window_pos_embed_bkg_spatial_size: [7, 7]
       window_spec: [8, 4, 16, 8]
-      prompt_mode: none
+      prompt_mode: prompt_generator
       peft_linear_mode: none
+      lora_r: 16
     neck:
       _target_: sam2.modeling.backbones.image_encoder.FpnNeck
       position_encoding:

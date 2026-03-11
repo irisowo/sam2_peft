@@ -8,14 +8,8 @@ model:
     scalp: 1
     trunk:
       _target_: sam2.modeling.backbones.hieradet.Hiera
-      embed_dim: 144
+      embed_dim: 112
       num_heads: 2
-      stages: [2, 6, 36, 4]
-      global_att_blocks: [23, 33, 43]
-      window_pos_embed_bkg_spatial_size: [7, 7]
-      window_spec: [8, 4, 16, 8]
-      prompt_mode: none
-      peft_linear_mode: none
     neck:
       _target_: sam2.modeling.backbones.image_encoder.FpnNeck
       position_encoding:
@@ -25,7 +19,7 @@ model:
         scale: null
         temperature: 10000
       d_model: 256
-      backbone_channel_list: [1152, 576, 288, 144]
+      backbone_channel_list: [896, 448, 224, 112]
       fpn_top_down_levels: [2, 3]  # output level 0 and 1 directly use the backbone features
       fpn_interp_model: nearest
 
@@ -86,7 +80,7 @@ model:
           layer_scale_init_value: 1e-6
           use_dwconv: True  # depth-wise convs
         num_layers: 2
-  
+
   num_maskmem: 7
   image_size: 1024
   # apply scaled sigmoid on mask logits for memory encoder, and directly feed input mask as output mask

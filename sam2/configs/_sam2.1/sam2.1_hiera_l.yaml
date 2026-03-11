@@ -14,8 +14,6 @@ model:
       global_att_blocks: [23, 33, 43]
       window_pos_embed_bkg_spatial_size: [7, 7]
       window_spec: [8, 4, 16, 8]
-      prompt_mode: none
-      peft_linear_mode: none
     neck:
       _target_: sam2.modeling.backbones.image_encoder.FpnNeck
       position_encoding:
@@ -86,7 +84,7 @@ model:
           layer_scale_init_value: 1e-6
           use_dwconv: True  # depth-wise convs
         num_layers: 2
-  
+
   num_maskmem: 7
   image_size: 1024
   # apply scaled sigmoid on mask logits for memory encoder, and directly feed input mask as output mask
