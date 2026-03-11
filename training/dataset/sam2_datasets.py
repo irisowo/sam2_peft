@@ -13,6 +13,7 @@ import torch
 from torch.utils.data import BatchSampler, DataLoader, Dataset, IterableDataset, Subset
 
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.sampler import RandomSampler, SequentialSampler
 
 
 class MixedDataLoader:
@@ -177,4 +178,59 @@ class TorchTrainMixedDataset:
                     worker_init_fn=self.worker_init_fn,
                 )
             )
+        return MixedDataLoader(dataloaders, self.dataset_prob)
+
+
+class TorchTrainMixedDataset_Single(TorchTrainMixedDataset):
+    """
+    Dataset Wrapper for Single GPU (Non-Distributed)
+    Overwrite get_loader to remove DistributedSampler.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def get_loader(self, epoch) -> Iterable:
+        dataloaders = []
+        for d_idx, (dataset, batch_size) in enumerate(
+                zip(self.datasets, self.batch_sizes)):
+
+            # Same phases_per_epoch logic as the parent class, but without DistributedSampler shuffling logic.
+            if self.phases_per_epoch > 1:
+                main_epoch = epoch // self.phases_per_epoch
+                local_phase = epoch % self.phases_per_epoch
+
+                if local_phase == 0 or self.chunks[d_idx] is None:
+                    self._set_dataset_epoch(dataset, main_epoch)
+                    g = torch.Generator()
+                    g.manual_seed(main_epoch)
+                    self.chunks[d_idx] = torch.chunk(
+                        torch.randperm(len(dataset), generator=g),
+                        self.phases_per_epoch,
+                    )
+                dataset = Subset(dataset, self.chunks[d_idx][local_phase])
+            else:
+                self._set_dataset_epoch(dataset, epoch)
+
+            # Replace DistributedSampler with RandomSampler/SequentialSampler
+            if self.shuffle:
+                # Replacement for DistributedSampler(shuffle=True)
+                sampler = RandomSampler(dataset)
+            else:
+                # Replacement for DistributedSampler(shuffle=False)
+                sampler = SequentialSampler(dataset)
+
+            # Note that RandomSampler does not need set_epoch(epoch)
+            batch_sampler = BatchSampler(sampler,
+                                         batch_size,
+                                         drop_last=self.drop_last)
+            dataloaders.append(
+                DataLoader(
+                    dataset,
+                    num_workers=self.num_workers,
+                    pin_memory=self.pin_memory,
+                    batch_sampler=batch_sampler,
+                    collate_fn=self.collate_fn,
+                    worker_init_fn=self.worker_init_fn,
+                ))
         return MixedDataLoader(dataloaders, self.dataset_prob)

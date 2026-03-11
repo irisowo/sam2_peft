@@ -11,6 +11,7 @@ import os
 import numpy as np
 import pandas as pd
 import torch
+import cv2
 
 from PIL import Image as PILImage
 
@@ -298,3 +299,52 @@ class SA1BSegmentLoader:
 
     def load(self, frame_idx):
         return self.segments
+
+
+class ConnectedComponentSegmentLoader:
+    def __init__(self, mask_png_path, multi_instance):
+        """
+        mask_png_path: path to train_masks/<cid>.png
+        We assume the mask is a binary mask, where 0 is background and 255 is foreground. 
+        If multi_instance is True, we will treat each connected component in the foreground as a separate object.
+        If multi_instance is False, we will treat the union of all connected components as a single object.
+        """
+        self.mask_png_path = mask_png_path
+
+        mask_gray = cv2.imread(mask_png_path, cv2.IMREAD_GRAYSCALE)
+        fg = (mask_gray > 0).astype(np.uint8)
+
+        # connected component analysis
+        if multi_instance:
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+                fg, connectivity=8)
+            # labels: HxW，每個 pixel 是 {0..num_labels-1} 的 component id
+            self.components = {}
+            min_area = 10
+            for comp_id in range(1, num_labels):  # 0 is background
+                comp_mask = (labels == comp_id)  # bool
+                if comp_mask.sum() < min_area:
+                    continue
+                self.components[comp_id] = torch.from_numpy(
+                    comp_mask.astype(np.uint8))
+
+            # obj_id is consecutive and start from 1
+            # map {comp_id_original -> new_id_starting_from_1}
+            remap = {}
+            for new_id, old_id in enumerate(sorted(self.components.keys()),
+                                            start=1):
+                remap[old_id] = new_id
+            self.components = {
+                remap[old_id]: mask
+                for old_id, mask in self.components.items()
+            }
+        else:
+            self.union = torch.from_numpy(fg.astype(np.uint8))
+            self.components = {1: self.union}
+
+    def load(self, frame_idx):
+        """
+        Refer to PalettisedPNGSegmentLoader / MultiplePNGSegmentLoader
+        Return {obj_id(int): binary_mask(torch.bool/uint8)}
+        """
+        return self.components

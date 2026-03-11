@@ -64,8 +64,11 @@ class SAM2Train(SAM2Base):
         use_act_ckpt_iterative_pt_sampling=False,
         # whether to forward image features per frame (as it's being tracked) during evaluation, instead of forwarding image features
         # of all frames at once. This avoids backbone OOM errors on very long videos in evaluation, but could be slightly slower.
-        forward_backbone_per_frame_for_eval=False,
-        freeze_image_encoder=False,
+        forward_backbone_per_frame_for_eval=True,
+        freeze_image_encoder=True,
+        freeze_mask_decoder=True,
+        unfreeze_pattern=None,
+        non_prompt_mode=False,
         **kwargs,
     ):
         super().__init__(image_encoder, memory_attention, memory_encoder, **kwargs)
@@ -99,10 +102,33 @@ class SAM2Train(SAM2Base):
         self.prob_to_sample_from_gt_for_train = prob_to_sample_from_gt_for_train
         # A random number generator with a fixed initial seed across GPUs
         self.rng = np.random.default_rng(seed=42)
+        self.non_prompt_mode = non_prompt_mode
+
+        if unfreeze_pattern is not None:
+            unfreeze_pattern = unfreeze_pattern.strip()
+        print(f'freeze_image_encoder={freeze_image_encoder}\n' +
+              f'unfreeze_pattern={unfreeze_pattern}')
 
         if freeze_image_encoder:
+            # freeze image encoder
             for p in self.image_encoder.parameters():
                 p.requires_grad = False
+
+            for n, p in self.image_encoder.named_parameters():
+                if unfreeze_pattern is not None and unfreeze_pattern in n:
+                    p.requires_grad = True
+                    print(f'Unfreeze param: {n}')
+        # "mask_decoder"
+        if freeze_mask_decoder:
+            self.sam_mask_decoder.eval()
+        else:
+            if unfreeze_pattern is not None:
+                for n, p in self.sam_mask_decoder.named_parameters():
+                    if unfreeze_pattern in n:
+                        p.requires_grad = True
+                        print(f'Unfreeze param: {n}')
+
+        self.sam_prompt_encoder.eval()  # freeze prompt encoder during training
 
     def forward(self, input: BatchedVideoDatapoint):
         if self.training or not self.forward_backbone_per_frame_for_eval:
@@ -178,6 +204,19 @@ class SAM2Train(SAM2Base):
             rand_frames_to_correct = self.rand_frames_to_correct_for_eval
             num_init_cond_frames = self.num_init_cond_frames_for_eval
             rand_init_cond_frames = self.rand_init_cond_frames_for_eval
+
+        if self.non_prompt_mode:
+            backbone_out["use_pt_input"] = False
+            backbone_out["init_cond_frames"] = [start_frame_idx]
+            backbone_out["frames_not_in_init_cond"] = [
+                t for t in range(start_frame_idx, num_frames)
+                if t != start_frame_idx
+            ]
+            backbone_out["mask_inputs_per_frame"] = {}
+            backbone_out["point_inputs_per_frame"] = {}
+            backbone_out["frames_to_add_correction_pt"] = []
+            return backbone_out
+
         if num_frames == 1:
             # here we handle a special case for mixing video + SAM on image training,
             # where we force using point input for the SAM task on static images

@@ -31,7 +31,6 @@ if os.path.isdir(os.path.join(sam2.__path__[0], "sam2")):
         "rather than its parent dir, or from your home directory) after installing SAM 2."
     )
 
-
 HF_MODEL_ID_TO_FILENAMES = {
     "facebook/sam2-hiera-tiny": (
         "configs/sam2/sam2_hiera_t.yaml",
@@ -164,11 +163,32 @@ def build_sam2_video_predictor_hf(model_id, **kwargs):
 def _load_checkpoint(model, ckpt_path):
     if ckpt_path is not None:
         sd = torch.load(ckpt_path, map_location="cpu", weights_only=True)["model"]
-        missing_keys, unexpected_keys = model.load_state_dict(sd)
+        missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
+        if 'sam2.1_hiera_large.pt' in ckpt_path:
+            allow_missing = ["prompt_generator"]
+        else:
+            allow_missing = [
+                "no_obj_ptr",
+                "mask_downsample",
+                "no_obj_embed_spatial",
+                "obj_ptr_proj",
+                "obj_ptr_tpos_proj",
+                "maskmem_tpos_enc",
+                "sam_mask_decoder.pred_obj_score_head",
+                "sam_mask_decoder.obj_score_token",
+                "memory_encoder",
+                "memory_attention",
+            ]
+        missing_keys = [
+            k for k in missing_keys
+            if not any([am in k for am in allow_missing])
+        ]
         if missing_keys:
             logging.error(missing_keys)
             raise RuntimeError()
         if unexpected_keys:
+            lora_keys = [k for k in model.state_dict().keys() if 'lora_' in k]
+            print(lora_keys)
             logging.error(unexpected_keys)
             raise RuntimeError()
         logging.info("Loaded checkpoint sucessfully")

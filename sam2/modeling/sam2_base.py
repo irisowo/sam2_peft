@@ -130,10 +130,11 @@ class SAM2Base(torch.nn.Module):
             self.mem_dim = self.memory_encoder.out_proj.weight.shape[0]
         self.num_maskmem = num_maskmem  # Number of memories accessible
         # Temporal encoding of the memories
-        self.maskmem_tpos_enc = torch.nn.Parameter(
-            torch.zeros(num_maskmem, 1, 1, self.mem_dim)
-        )
-        trunc_normal_(self.maskmem_tpos_enc, std=0.02)
+        if self.num_maskmem > 0:
+            self.maskmem_tpos_enc = torch.nn.Parameter(
+                torch.zeros(num_maskmem, 1, 1, self.mem_dim)
+            )
+            trunc_normal_(self.maskmem_tpos_enc, std=0.02)
         # a single token to indicate no memory embedding from previous frames
         self.no_mem_embed = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
         self.no_mem_pos_enc = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))

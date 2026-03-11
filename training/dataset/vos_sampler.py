@@ -103,3 +103,28 @@ class EvalSampler(VOSSampler):
             raise Exception("First frame of the video has no objects")
 
         return SampledFramesAndObjects(frames=frames, object_ids=object_ids)
+
+
+class SingleFrameSampler(VOSSampler):
+
+    def __init__(self, max_num_objects):
+        super().__init__(sort_frames=True)
+        self.max_num_objects = max_num_objects
+
+    def sample(self, video, segment_loader, epoch=None):
+        # video.frames 只有一個
+        frame = video.frames[0]
+
+        # Sample max_num_objects from all visible objects in the frame
+        segs = segment_loader.load(frame.frame_idx)  # dict {obj_id: mask}
+        visible_object_ids = []
+        for object_id, mask in segs.items():
+            # skip images without any object
+            if mask.sum() > 0:
+                visible_object_ids.append(object_id)
+        object_ids = visible_object_ids[:self.max_num_objects]
+
+        return SampledFramesAndObjects(
+            frames=[frame],
+            object_ids=object_ids,
+        )

@@ -24,6 +24,7 @@ from training.dataset.vos_segment_loader import (
     MultiplePNGSegmentLoader,
     PalettisedPNGSegmentLoader,
     SA1BSegmentLoader,
+    ConnectedComponentSegmentLoader,
 )
 
 
@@ -306,3 +307,57 @@ class JSONRawDataset(VOSRawDataset):
 
     def __len__(self):
         return len(self.video_names)
+
+
+# Custom
+class SingleFrameRawDataset(VOSRawDataset):
+    """
+    Take train_images/*.jpg, train_masks/*.png as single-frame videos for training.
+        - video_name: cid
+        - frame_idx: 0
+    """
+
+    def __init__(self,
+                 img_folder,
+                 gt_folder,
+                 multi_instance=True,
+                 file_list_txt=None):
+        self.img_folder = img_folder
+        self.gt_folder = gt_folder
+        self.multi_instance = multi_instance
+
+        if file_list_txt is not None:
+            with open(file_list_txt, "r") as f:
+                base_ids = [line.strip() for line in f]
+        else:
+            # Take all .jpg files in the img_folder as samples
+            base_ids = [
+                os.path.splitext(fn)[0] for fn in os.listdir(img_folder)
+                if fn.lower().endswith(".jpg")
+            ]
+
+        # Filter out IDs without mask files
+        self.sample_ids = [
+            cid for cid in base_ids
+            if os.path.exists(os.path.join(gt_folder, cid + ".png"))
+        ]
+
+    def __len__(self):
+        return len(self.sample_ids)
+
+    def get_video(self, idx):
+        cid = self.sample_ids[idx]
+        img_path = os.path.join(self.img_folder, cid + ".jpg")
+        mask_path = os.path.join(self.gt_folder, cid + ".png")
+
+        frames = [VOSFrame(frame_idx=0, image_path=img_path)]
+
+        video = VOSVideo(
+            video_name=cid,
+            video_id=idx,
+            frames=frames,
+        )
+
+        segment_loader = ConnectedComponentSegmentLoader(
+            mask_path, self.multi_instance)
+        return video, segment_loader

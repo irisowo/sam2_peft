@@ -11,37 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ImageEncoder(nn.Module):
-    def __init__(
-        self,
-        trunk: nn.Module,
-        neck: nn.Module,
-        scalp: int = 0,
-    ):
-        super().__init__()
-        self.trunk = trunk
-        self.neck = neck
-        self.scalp = scalp
-        assert (
-            self.trunk.channel_list == self.neck.backbone_channel_list
-        ), f"Channel dims of trunk and neck do not match. Trunk: {self.trunk.channel_list}, neck: {self.neck.backbone_channel_list}"
-
-    def forward(self, sample: torch.Tensor):
-        # Forward through backbone
-        features, pos = self.neck(self.trunk(sample))
-        if self.scalp > 0:
-            # Discard the lowest resolution features
-            features, pos = features[: -self.scalp], pos[: -self.scalp]
-
-        src = features[-1]
-        output = {
-            "vision_features": src,
-            "vision_pos_enc": pos,
-            "backbone_fpn": features,
-        }
-        return output
-
-
 class FpnNeck(nn.Module):
     """
     A modified variant of Feature Pyramid Network (FPN) neck
@@ -117,9 +86,8 @@ class FpnNeck(nn.Module):
                     prev_features.to(dtype=torch.float32),
                     scale_factor=2.0,
                     mode=self.fpn_interp_model,
-                    align_corners=(
-                        None if self.fpn_interp_model == "nearest" else False
-                    ),
+                    align_corners=(None if self.fpn_interp_model == "nearest"
+                                   else False),
                     antialias=False,
                 )
                 prev_features = lateral_features + top_down_features
@@ -132,3 +100,36 @@ class FpnNeck(nn.Module):
             pos[i] = self.position_encoding(x_out).to(x_out.dtype)
 
         return out, pos
+
+
+class ImageEncoder(nn.Module):
+
+    def __init__(
+        self,
+        trunk: nn.Module,
+        neck: nn.Module,
+        scalp: int = 0,
+    ):
+        super().__init__()
+        self.trunk = trunk
+        self.neck = neck
+        self.scalp = scalp
+        self.prompt_generator = "test_prompt_generator"
+        assert (
+            self.trunk.channel_list == self.neck.backbone_channel_list
+        ), f"Channel dims of trunk and neck do not match. Trunk: {self.trunk.channel_list}, neck: {self.neck.backbone_channel_list}"
+
+    def forward(self, sample: torch.Tensor):
+        # Forward through backbone
+        features, pos = self.neck(self.trunk(sample))
+        if self.scalp > 0:
+            # Discard the lowest resolution features
+            features, pos = features[:-self.scalp], pos[:-self.scalp]
+
+        src = features[-1]
+        output = {
+            "vision_features": src,
+            "vision_pos_enc": pos,
+            "backbone_fpn": features,
+        }
+        return output
