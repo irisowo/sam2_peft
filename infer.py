@@ -598,7 +598,7 @@ def demo():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--cdf", type=str, required=True, help="which CDF to infer, e.g. 01, 02, ..."
+        "--cdf", type=str, default=None, help="which CDF to infer, e.g. 01, 02, ..."
     )
     parser.add_argument(
         "--infer_img_dir", type=str, default="data/infer_08/test_images"
@@ -616,6 +616,11 @@ if __name__ == "__main__":
         type=str,
         default="(nobox)",
         help="whether to use box input for SAM2, e.g. (nobox), (gtbox)",
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="run demo with data/demo.jpg",
     )
     args = parser.parse_args()
 
@@ -652,11 +657,13 @@ if __name__ == "__main__":
         )
     assert model_save_path.exists(), f"Model checkpoint: {model_save_path} is not found"
 
-    # demo()
-    infer(
-        model_type=model_type,
-        epoch=epoch,
-        box_type=box_type,
-        infer_img_dir=infer_img_dir,
-        save_dir=save_dir,
-    )
+    if args.demo:
+        demo()
+    else:
+        infer(
+            model_type=model_type,
+            epoch=epoch,
+            box_type=box_type,
+            infer_img_dir=infer_img_dir,
+            save_dir=save_dir,
+        )

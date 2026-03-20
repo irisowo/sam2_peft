@@ -1,5 +1,40 @@
-# SAM 2: Segment Anything in Images and Videos
+# SAM2_PEFT
 
+## References
+* Efficient selective tuning
+    * LoRA
+    * [DoRA](https://github.com/catid/dora)
+    * [RLRR](https://github.com/zstarN70/RLRR)
+    * [EDoRA](https://github.com/Hamid-Nasiri/EDoRA.)
+* Adapter-based
+    * [SAM2-Adapter](https://github.com/tianrun-chen/SAM-Adapter-PyTorch/tree/SAM2-Adapter-for-Segment-Anything-2)
+    * [AdapterPlus](https://github.com/visinf/adapter_plus)
+
+## Usage
+### Demo
+```bash
+python infer.py --demo
+```
+
+### Training
+* If the model name includes the stage2 postfix, only the encoder and decoder are trained; otherwise, the prompt encoder is trained.
+```bash
+bash train.sh
+```
+
+### In-house Dataset (MVTec-style)
+* Example Input: `data/infer_08/test_images`
+    * `cdf`: confirm_defect, a term from AOI inspection in SMT manufacturing.
+    * Images from train/good and test/<defect_type> are merged into a single folder and renamed as:
+    `{cid}@{train|test}@{filename (e.g., 000.jpg)}`
+        * `cid = {CompName}@{PartNo}@{PackageType}@{cmodel}`, representing a specific PCB patch.
+    * `infer()` generates:
+        1. Class-agnostic binary masks → `data/infer_<cdf>/<model_type>/*.png`
+        2. Thresholded anomaly masks of test images → `data/infer_<cdf>/<model_type>/anomaly_mask/*_anomaly_mask.png`
+
+---
+> [!NOTE] The content below is the original README.
+# SAM 2: Segment Anything in Images and Videos
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**
 
 [Nikhila Ravi](https://nikhilaravi.com/), [Valentin Gabeur](https://gabeur.github.io/), [Yuan-Ting Hu](https://scholar.google.com/citations?user=E8DVVYQAAAAJ&hl=en), [Ronghang Hu](https://ronghanghu.com/), [Chaitanya Ryali](https://scholar.google.com/citations?user=4LWx24UAAAAJ&hl=en), [Tengyu Ma](https://scholar.google.com/citations?user=VeTSl0wAAAAJ&hl=en), [Haitham Khedr](https://hkhedr.com/), [Roman Rädle](https://scholar.google.de/citations?user=Tpt57v0AAAAJ&hl=en), [Chloe Rolland](https://scholar.google.com/citations?hl=fr&user=n-SnMhoAAAAJ), [Laura Gustafson](https://scholar.google.com/citations?user=c8IpF9gAAAAJ&hl=en), [Eric Mintun](https://ericmintun.github.io/), [Junting Pan](https://junting.github.io/), [Kalyan Vasudev Alwala](https://scholar.google.co.in/citations?user=m34oaWEAAAAJ&hl=en), [Nicolas Carion](https://www.nicolascarion.com/), [Chao-Yuan Wu](https://chaoyuan.org/), [Ross Girshick](https://www.rossgirshick.info/), [Piotr Dollár](https://pdollar.github.io/), [Christoph Feichtenhofer](https://feichtenhofer.github.io/)
