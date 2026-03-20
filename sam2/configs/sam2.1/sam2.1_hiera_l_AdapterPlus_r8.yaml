@@ -16,6 +16,9 @@ model:
       window_spec: [8, 4, 16, 8]
       prompt_mode: none
       peft_linear_mode: none
+      adapter_mode: adapter_plus
+      lora_r: 16
+      adapter_plus_rank: 8
     neck:
       _target_: sam2.modeling.backbones.image_encoder.FpnNeck
       position_encoding:

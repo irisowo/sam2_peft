@@ -29,6 +29,8 @@ REQUIRED_PACKAGES = [
     "hydra-core>=1.3.2",
     "iopath>=0.1.10",
     "pillow>=9.4.0",
+    "python-dotenv>=1.0.0",
+    "huggingface_hub>=1.7.0",
 ]
 
 EXTRA_PACKAGES = {

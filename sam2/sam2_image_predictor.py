@@ -437,6 +437,32 @@ class SAM2ImagePredictor:
 
         return masks, iou_predictions, low_res_masks
 
+    def get_feat_list(self) -> List[torch.Tensor]:
+        if not self._is_image_set:
+            raise RuntimeError(
+                "An image must be set with .set_image(...) before retrieving features."
+            )
+        # f0: [B, 32, 256, 256] (stride 4)
+        # f1: [B, 64, 128, 128] (stride 8)
+        # f2: [B, 256, 64, 64]  (stride 16)
+        return [
+            self._features["high_res_feats"][0],
+            self._features["high_res_feats"][1],
+            self._features["image_embed"],
+        ]
+
+    def get_upsample_feat(self) -> torch.Tensor:
+
+        f0, f1, f2 = self.get_feature_map_list()
+        target_size = f0.shape[-2:]
+        f1_up = torch.nn.functional.interpolate(
+            f1, size=target_size, mode="bilinear", align_corners=False
+        )
+        f2_up = torch.nn.functional.interpolate(
+            f2, size=target_size, mode="bilinear", align_corners=False
+        )
+        return torch.cat([f0, f1_up, f2_up], dim=1)
+
     def get_image_embedding(self) -> torch.Tensor:
         """
         Returns the image embeddings for the currently set image, with
