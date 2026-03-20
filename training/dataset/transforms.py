@@ -3,7 +3,6 @@
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-
 """
 Transforms and data augmentation for both image + bbox.
 """
@@ -17,6 +16,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import torchvision.transforms.v2.functional as Fv2
+from torchvision.transforms.functional import InterpolationMode
 from PIL import Image as PILImage
 
 from torchvision.transforms import InterpolationMode
@@ -30,6 +30,18 @@ def hflip(datapoint, index):
     for obj in datapoint.frames[index].objects:
         if obj.segment is not None:
             obj.segment = F.hflip(obj.segment)
+
+    return datapoint
+
+
+def vflip(datapoint, index):
+    # Flip the image data vertically
+    datapoint.frames[index].data = F.vflip(datapoint.frames[index].data)
+
+    # Flip all object segments (masks) vertically
+    for obj in datapoint.frames[index].objects:
+        if obj.segment is not None:
+            obj.segment = F.vflip(obj.segment)
 
     return datapoint
 
@@ -151,6 +163,45 @@ class RandomHorizontalFlip:
         for i in range(len(datapoint.frames)):
             if random.random() < self.p:
                 datapoint = hflip(datapoint, i)
+        return datapoint
+
+
+class RandomVerticalFlip:
+    def __init__(self, consistent_transform, p=0.5):
+        self.p = p
+        self.consistent_transform = consistent_transform
+
+    def __call__(self, datapoint, **kwargs):
+        if self.consistent_transform:
+            # If consistent, decide once for the whole video/batch
+            if random.random() < self.p:
+                for i in range(len(datapoint.frames)):
+                    datapoint = vflip(datapoint, i)
+            return datapoint
+
+        # If not consistent, decide independently for each frame
+        for i in range(len(datapoint.frames)):
+            if random.random() < self.p:
+                datapoint = vflip(datapoint, i)
+        return datapoint
+
+
+class ResizeAPI:
+
+    def __init__(self, size, max_size=None, square=False, v2=False):
+        self.size = size
+        self.max_size = max_size
+        self.square = square
+        self.v2 = v2
+
+    def __call__(self, datapoint, **kwargs):
+        for i in range(len(datapoint.frames)):
+            datapoint = resize(datapoint,
+                               i,
+                               self.size,
+                               self.max_size,
+                               square=self.square,
+                               v2=self.v2)
         return datapoint
 
 
@@ -382,6 +433,9 @@ class RandomAffine:
 
             transformed_bboxes, transformed_masks = [], []
             for i in range(len(img.objects)):
+                untransformed_mask = this_masks[i]
+                assert untransformed_mask.max(
+                ) > 0, "Mask cannot be empty before affine transformation"
                 if this_masks[i] is None:
                     transformed_masks.append(None)
                     # Dummy bbox for a dummy target
